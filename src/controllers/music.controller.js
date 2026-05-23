@@ -5,86 +5,79 @@ const { uploadFile } = require("../services/storage.service");
 
 
 async function createMusic(req, res) {
-    const token = req.cookies.token;
 
-    if (!token) {
-        return res.status(401).json({ message: "Unathorized" })
-    }
+    const { title } = req.body;
+    const file = req.file;
+    const result = await uploadFile(file.buffer.toString('base64'));
+    const music = await musicModel.create({
+        uri: result.url,
+        title,
+        artist: req.user.id,
+    })
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded.role != "artist") {
-            return res.status(403).json({ message: "You dont have acess to create music." })
+    res.status(201).json({
+        message: "Music created successfully",
+        music: {
+            id: music._id,
+            uri: music.uri,
+            title: music.title,
+            artist: music.artist,
         }
-
-        const { title } = req.body;
-        const file = req.file;
-
-
-        const result = await uploadFile(file.buffer.toString('base64'));
-        
-
-        const music = await musicModel.create({
-            uri: result.url,
-            title,
-            artist: decoded.id,
-        })
-
-        res.status(201).json({
-            message: "Music created successfully",
-            music: {
-                id: music._id,
-                uri: music.uri,
-                title: music.title,
-                artist: music.artist,
-            }
-        })
-
-    } catch (error) {
-        console.log("error")
-        return res.status(401).json({ message: "Unathorized", error: `${error}` })
-    }
+    })
 }
 
-async function createAlbum(req,res){
-    const token = req.cookies.token;
-    
-    if(!token){
-        return res.status(401).json({
-            message:"Unauthorized",
-        })
-    }
+async function createAlbum(req, res) {
+    const { title, musics } = req.body;
+    const album = await albumModel.create({
+        title,
+        artist: req.user.id,
+        musics: musics,
+    })
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        if(decoded.role !== 'artist'){
-            return res.status(403).json({
-                message:"You dont have access to create an album"
-            })
+    res.status(201).json({
+        message: "Album created successfully.",
+        album: {
+            id: album._id,
+            title: album.title,
+            artist: album.artist,
+            musics: album.musics
         }
-
-        const {title, musics}=req.body;
-        
-        const album = await albumModel.create({
-            title,
-            artist:decoded.id,
-            musics:musics,
-        })
-
-        res.status(201).json({
-            message:"Album created successfully.",
-            album:{
-                id:album._id,
-                title:album.title,
-                artist:album.artist,
-                musics:album.musics
-            }
-        })
-
-    } catch (error) {
-        return res.status(401).json({message: "Unauthorized"})
-    }
+    })
 }
 
-module.exports = { createMusic, createAlbum };
+async function getAllMusics(req,res){
+    const musics = await musicModel
+        .find()
+        .skip(1) // first song will be skipped and will send from 2nd song
+        .limit(20) // max upper limit
+
+    res.status(200).json({
+        message:"Music fetched successfully",
+        musics: musics,
+    })
+}
+
+async function getAllAlbums(req,res){
+    const albums = await albumModel.find()
+        .limit(20)
+        .select("title artist")
+        .populate("artist","username email")
+    res.status(200).json({
+        message: "Album fetched successfully",
+        albums: albums,
+    })
+}
+
+async function getAlbumById(req,res){
+    const albumId = req.params.albumId;
+    const album = await albumModel.findById(albumId)
+        .populate("artist","username email")
+        .limit(20)
+        .populate("musics")
+    return res.status(200).json({
+        message:"Album fetched successful",
+        album:album
+    })
+}
+
+module.exports = { createMusic, createAlbum , getAllMusics, getAllAlbums, getAlbumById};

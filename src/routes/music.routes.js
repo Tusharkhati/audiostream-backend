@@ -11,5 +11,4 @@ const upload = multer ({
 router.post("/upload", upload.single("music"), musicController.createMusic);
 router.post("/album", musicController.createAlbum);
 
-
 module.exports = router; 
